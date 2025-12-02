@@ -1,49 +1,34 @@
 package com.example.bicireparoapp.viewmodel
 
-import android.app.Application
-import android.content.Context
 import android.util.Patterns
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.example.bicireparoapp.data.BiciRepository
+import com.example.bicireparoapp.model.Usuario
+import kotlinx.coroutines.launch
 
-class RegisterViewModel(application: Application) : AndroidViewModel(application) {
+class RegisterViewModel(private val repository: BiciRepository) : ViewModel() {
 
-    // --- LiveData ---
     private val _nameError = MutableLiveData<String?>()
-    private val _emailError = MutableLiveData<String?>()
-    private val _passwordError = MutableLiveData<String?>()
-    private val _confirmPasswordError = MutableLiveData<String?>()
-    private val _registrationSuccess = MutableLiveData<Boolean>()
-
     val nameError: LiveData<String?> = _nameError
+
+    private val _emailError = MutableLiveData<String?>()
     val emailError: LiveData<String?> = _emailError
+
+    private val _passwordError = MutableLiveData<String?>()
     val passwordError: LiveData<String?> = _passwordError
+
+    private val _confirmPasswordError = MutableLiveData<String?>()
     val confirmPasswordError: LiveData<String?> = _confirmPasswordError
+
+    private val _registrationSuccess = MutableLiveData<Boolean>()
     val registrationSuccess: LiveData<Boolean> = _registrationSuccess
 
-    /**
-     * CAMBIO 1: La función ahora se llama 'saveUser'
-     * y acepta los 3 datos.
-     */
-    private fun saveUser(name: String, email: String, pass: String) {
-        val context = getApplication<Application>().applicationContext
-        val sharedPrefs = context.getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
-
-        with(sharedPrefs.edit()) {
-            putString("USER_NAME", name)
-            // CAMBIO 2: Guardamos también el email y la contraseña
-            putString("USER_EMAIL", email)
-            putString("USER_PASSWORD", pass)
-            apply()
-        }
-    }
-
-    /**
-     * Función de validación (Casi igual que antes)
-     */
     fun validateForm(name: String, email: String, pass: String, confirmPass: String) {
-        // --- (Toda la lógica de validación de campos queda exactamente igual) ---
+        // Limpiar errores
         _nameError.value = null
         _emailError.value = null
         _passwordError.value = null
@@ -59,14 +44,14 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
             _emailError.value = "El email es obligatorio"
             isValid = false
         } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _emailError.value = "El formato del email no es válido"
+            _emailError.value = "Email inválido"
             isValid = false
         }
         if (pass.isEmpty()) {
             _passwordError.value = "La contraseña es obligatoria"
             isValid = false
         } else if (pass.length < 6) {
-            _passwordError.value = "La contraseña debe tener al menos 6 caracteres"
+            _passwordError.value = "Mínimo 6 caracteres"
             isValid = false
         }
         if (confirmPass.isEmpty()) {
@@ -76,12 +61,35 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
             _confirmPasswordError.value = "Las contraseñas no coinciden"
             isValid = false
         }
-        // --- (Fin de la lógica de validación) ---
 
         if (isValid) {
-            // CAMBIO 3: Llamamos a la nueva función con los 3 datos
-            saveUser(name, email, pass)
-            _registrationSuccess.value = true
+            // Verificar si ya existe el usuario antes de insertar
+            viewModelScope.launch {
+                val existe = repository.buscarUsuarioPorEmail(email)
+                if (existe != null) {
+                    _emailError.value = "Este email ya está registrado"
+                } else {
+                    // Crear y guardar usuario
+                    val nuevoUsuario = Usuario(
+                        nombre = name,
+                        email = email,
+                        password = pass,
+                        rol = "cliente" // Por defecto es cliente
+                    )
+                    repository.insertUsuario(nuevoUsuario)
+                    _registrationSuccess.value = true
+                }
+            }
         }
+    }
+}
+
+class RegisterViewModelFactory(private val repository: BiciRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(RegisterViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return RegisterViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

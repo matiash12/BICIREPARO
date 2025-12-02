@@ -1,55 +1,80 @@
 package com.example.bicireparoapp.viewmodel
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.example.bicireparoapp.model.UsuarioResponse
+import com.example.bicireparoapp.network.UserApi // Importamos la interfaz
+import kotlinx.coroutines.launch
+import retrofit2.Response
 
-// Usamos AndroidViewModel para poder acceder a SharedPreferences
-class LoginViewModel(application: Application) : AndroidViewModel(application) {
+// CAMBIO: Ahora recibimos 'api' en el constructor
+class LoginViewModel(application: Application, private val api: UserApi) : AndroidViewModel(application) {
 
-    // Definimos los posibles estados del login
-    enum class LoginState {
-        SUCCESS, // Éxito
-        INVALID_CREDENTIALS, // Email o contraseña incorrectos
-        USER_NOT_FOUND // No hay ningún usuario registrado
+    // --- LOGIN ---
+    private val _loginResult = MutableLiveData<Result<UsuarioResponse>>()
+    val loginResult: LiveData<Result<UsuarioResponse>> = _loginResult
+
+    fun login(email: String, pass: String) {
+        viewModelScope.launch {
+            try {
+                val credenciales = mapOf("email" to email, "password" to pass)
+                // Usamos 'api' (que viene del constructor) en lugar de RetrofitClient directo
+                val response = api.login(credenciales)
+
+                if (response.isSuccessful && response.body() != null) {
+                    _loginResult.value = Result.success(response.body()!!)
+                } else {
+                    _loginResult.value = Result.failure(Exception("Credenciales incorrectas"))
+                }
+            } catch (e: Exception) {
+                _loginResult.value = Result.failure(Exception("Error de conexión: ${e.message}"))
+            }
+        }
     }
 
-    // LiveData para notificar a la Activity sobre el estado del login
-    private val _loginState = MutableLiveData<LoginState>()
-    val loginState: LiveData<LoginState> = _loginState
+    // --- REGISTRO ---
+    private val _registerResult = MutableLiveData<Result<UsuarioResponse>>()
+    val registerResult: LiveData<Result<UsuarioResponse>> = _registerResult
 
-    /**
-     * Esta es la función que la Activity llamará al presionar "Ingresar".
-     */
-    fun login(emailIngresado: String, passwordIngresada: String) {
+    fun registrar(nombre: String, email: String, pass: String, rol: String) {
+        viewModelScope.launch {
+            try {
+                val datosUsuario = mapOf(
+                    "nombre" to nombre,
+                    "email" to email,
+                    "password" to pass,
+                    "rol" to rol
+                )
+                // Usamos 'api'
+                val response = api.registrar(datosUsuario)
 
-        // 1. Validaciones básicas de campos vacíos (opcional pero recomendado)
-        if (emailIngresado.isEmpty() || passwordIngresada.isEmpty()) {
-            _loginState.value = LoginState.INVALID_CREDENTIALS
-            return
+                if (response.isSuccessful && response.body() != null) {
+                    _registerResult.value = Result.success(response.body()!!)
+                } else {
+                    _registerResult.value = Result.failure(Exception("Error al registrar"))
+                }
+            } catch (e: Exception) {
+                _registerResult.value = Result.failure(Exception("Error de conexión: ${e.message}"))
+            }
         }
+    }
+}
 
-        // 2. Acceder a SharedPreferences para leer los datos guardados
-        val context = getApplication<Application>().applicationContext
-        val sharedPrefs = context.getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
-
-        // 3. Obtener los datos del registro
-        // Si no encuentra nada, usa "null" como valor por defecto
-        val emailGuardado = sharedPrefs.getString("USER_EMAIL", null)
-        val passwordGuardada = sharedPrefs.getString("USER_PASSWORD", null)
-
-        // 4. Lógica de verificación
-        if (emailGuardado == null) {
-            // Aún no se ha registrado nadie
-            _loginState.value = LoginState.USER_NOT_FOUND
-        } else if (emailIngresado == emailGuardado && passwordIngresada == passwordGuardada) {
-            // ¡Éxito! Las credenciales coinciden
-            _loginState.value = LoginState.SUCCESS
-        } else {
-            // El email o la contraseña son incorrectos
-            _loginState.value = LoginState.INVALID_CREDENTIALS
+// FACTORY: Necesaria para pasarle la API al ViewModel
+class LoginViewModelFactory(
+    private val application: Application,
+    private val api: UserApi
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(LoginViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return LoginViewModel(application, api) as T
         }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

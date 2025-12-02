@@ -1,11 +1,13 @@
 package com.example.bicireparoapp.model
 
-/**
- * Data class para representar un servicio predefinido.
- * Incluye un nombre, una descripción simple y un precio.
- */
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "servicios")
 data class Servicio(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nombre: String,
     val descripcion: String,
-    val precio: String // Usamos String para el precio para incluir el signo "$"
+    val precio: Int,
+    val fotoUri: String? = null
 )

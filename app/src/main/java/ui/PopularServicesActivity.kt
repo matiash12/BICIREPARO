@@ -1,49 +1,56 @@
 package com.example.bicireparoapp.ui
 
+import android.content.Intent
 import android.os.Bundle
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Observer
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.bicireparoapp.BiciReparoApplication
 import com.example.bicireparoapp.R
 import com.example.bicireparoapp.databinding.ActivityPopularServicesBinding
-import com.example.bicireparoapp.model.Servicio
+import com.example.bicireparoapp.viewmodel.AdminServicesViewModel
+import com.example.bicireparoapp.viewmodel.AdminServicesViewModelFactory
 
 class PopularServicesActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPopularServicesBinding
+    private lateinit var servicioAdapter: ServicioAdapter // Debe estar importado
 
-    // 1. Declarar el Adapter
-    private lateinit var servicioAdapter: ServicioAdapter
-
-    // 2. Lista de servicios (la escribimos aquí mismo)
-    private val listaDeServicios = listOf(
-        Servicio("Ajuste de Cambios", "Regulación de desviadores delantero y trasero.", "$10.000"),
-        Servicio("Ajuste de Frenos", "Calibración y limpieza de frenos (V-Brake o disco).", "$10.000"),
-        Servicio("Inflado de Ruedas", "Revisión e inflado de neumáticos a presión correcta.", "$2.000"),
-        Servicio("Parche de Rueda", "Reparación de pinchazo (no incluye cámara nueva).", "$5.000"),
-        Servicio("Lubricación de Cadena", "Limpieza y lubricación profesional de transmisión.", "$7.000"),
-        Servicio("Mantención Básica", "Ajuste de cambios, frenos y lubricación.", "$25.000"),
-        Servicio("Centrado de Rueda", "Alineación y tensado de rayos (por rueda).", "$12.000")
-    )
+    // Usamos el ViewModel de Admin para LEER los servicios
+    private val servicesViewModel: AdminServicesViewModel by viewModels {
+        AdminServicesViewModelFactory((application as BiciReparoApplication).repository)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPopularServicesBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Configurar botón Volver
         binding.backTextView.setOnClickListener {
             finish()
-            overridePendingTransition(R.anim.stay_still, R.anim.slide_out_left)
         }
 
-        // 3. Configurar el RecyclerView
         setupRecyclerView()
     }
 
     private fun setupRecyclerView() {
-        // Inicializamos el adapter y le pasamos la lista de servicios
-        servicioAdapter = ServicioAdapter(listaDeServicios)
+        servicioAdapter = ServicioAdapter(emptyList()) { servicio ->
+            // Al hacer clic, abrimos el detalle (NO añadimos directo)
+            val intent = Intent(this, ServiceDetailActivity::class.java)
+            intent.putExtra("EXTRA_NOMBRE", servicio.nombre)
+            intent.putExtra("EXTRA_DESC", servicio.descripcion)
+            intent.putExtra("EXTRA_PRECIO", servicio.precio)
+            intent.putExtra("EXTRA_FOTO", servicio.fotoUri)
+            startActivity(intent)
+        }
 
-        // Asignamos el adapter a nuestro RecyclerView
+        binding.servicesRecyclerView.layoutManager = LinearLayoutManager(this)
         binding.servicesRecyclerView.adapter = servicioAdapter
+
+        // Observar la lista de servicios desde la Base de Datos
+        servicesViewModel.allServices.observe(this, Observer { servicios ->
+            servicioAdapter.actualizarLista(servicios)
+        })
     }
 }

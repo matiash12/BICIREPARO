@@ -1,76 +1,79 @@
 package com.example.bicireparoapp.ui
 
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.activity.viewModels // ¡Importante!
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Observer // ¡Importante!
-import com.example.bicireparoapp.R
 import com.example.bicireparoapp.databinding.ActivityRegisterBinding
-import com.example.bicireparoapp.viewmodel.RegisterViewModel
+import com.example.bicireparoapp.network.RetrofitClient // Importamos el cliente
+import com.example.bicireparoapp.viewmodel.LoginViewModel
+import com.example.bicireparoapp.viewmodel.LoginViewModelFactory // Importamos la Factory
 
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
 
-    // 1. Obtenemos una instancia de nuestro ViewModel
-    private val viewModel: RegisterViewModel by viewModels()
+    // CAMBIO CLAVE: Usamos la Factory para pasarle la API real
+    private val viewModel: LoginViewModel by viewModels {
+        LoginViewModelFactory(application, RetrofitClient.userInstance)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 2. Configuramos el botón de volver
-        binding.backTextView.setOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.stay_still, R.anim.slide_out_left)
-        }
+        setupSpinner()
 
-        // 3. Configuramos el botón de registrarse
         binding.registerButton.setOnClickListener {
-            // 3.1 Obtenemos los textos de los campos
-            val name = binding.nameEditText.text.toString()
-            val email = binding.emailEditText.text.toString()
-            val password = binding.passwordEditText.text.toString()
-            val confirmPassword = binding.confirmPasswordEditText.text.toString()
+            val nombre = binding.nombreEditText.text.toString().trim()
+            val email = binding.emailEditText.text.toString().trim()
+            val pass = binding.passwordEditText.text.toString().trim()
+            val rol = binding.roleSpinner.selectedItem.toString().lowercase()
 
-            // 3.2 Le pasamos los datos al "cerebro" (ViewModel) para que él los valide
-            viewModel.validateForm(name, email, password, confirmPassword)
+            // Tu validación de 6 caracteres ya está aquí incluida correctamente ✅
+            if (validarCampos(nombre, email, pass)) {
+                binding.registerButton.isEnabled = false
+                binding.registerButton.text = "Registrando..."
+                viewModel.registrar(nombre, email, pass, rol)
+            }
         }
 
-        // 4.
-        // La Activity se queda "escuchando" los cambios que el ViewModel publica.
+        viewModel.registerResult.observe(this) { result ->
+            binding.registerButton.isEnabled = true
+            binding.registerButton.text = "Registrar"
 
-        viewModel.nameError.observe(this, Observer { error ->
-            binding.nameInputLayout.error = error
-        })
-
-        viewModel.emailError.observe(this, Observer { error ->
-            binding.emailInputLayout.error = error
-        })
-
-        viewModel.passwordError.observe(this, Observer { error ->
-            binding.passwordInputLayout.error = error
-        })
-
-        viewModel.confirmPasswordError.observe(this, Observer { error ->
-            binding.confirmPasswordInputLayout.error = error
-        })
-
-        viewModel.registrationSuccess.observe(this, Observer { isSuccess ->
-            if (isSuccess) {
-                Toast.makeText(this, "¡Registro Exitoso!", Toast.LENGTH_SHORT).show()
-
-                // Navegamos a la pantalla principal
-                val intent = android.content.Intent(this, HomeActivity::class.java)
-                // Estas "flags" limpian las pantallas anteriores (Login/Registro)
-                // para que el usuario no pueda volver a ellas con el botón "atrás".
-                intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish() // Cierra RegisterActivity
-                overridePendingTransition(R.anim.slide_in_right, R.anim.stay_still)
+            if (result.isSuccess) {
+                Toast.makeText(this, "¡Registro Exitoso!", Toast.LENGTH_LONG).show()
+                finish()
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Error desconocido"
+                Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
             }
-        })
+        }
+    }
+
+    private fun setupSpinner() {
+        val roles = arrayOf("Cliente", "Admin")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, roles)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.roleSpinner.adapter = adapter
+    }
+
+    private fun validarCampos(nombre: String, email: String, pass: String): Boolean {
+        if (nombre.isEmpty()) {
+            Toast.makeText(this, "El nombre es obligatorio", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        if (!email.contains("@")) {
+            Toast.makeText(this, "Ingrese un email válido", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        if (pass.length < 6) {
+            Toast.makeText(this, "La contraseña debe tener mínimo 6 caracteres", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        return true
     }
 }

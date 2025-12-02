@@ -1,46 +1,39 @@
 package com.example.bicireparoapp.ui
 
-import android.Manifest
+import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.core.net.toUri
-import com.example.bicireparoapp.R
 import com.example.bicireparoapp.databinding.ActivityProfileBinding
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ProfileActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityProfileBinding
-    private var latestTmpUri: Uri? = null
+    private var currentUserEmail: String = ""
 
-    // Lanzador para tomar la foto (reutilizado de NewRequestActivity)
-    private val takePictureLauncher = registerForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { isSuccess ->
+    // Variable global mutable (puede ser nula)
+    private var photoUri: Uri? = null
+
+    // 1. Lanzador para la CÁMARA
+    private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { isSuccess ->
         if (isSuccess) {
-            latestTmpUri?.let { uri ->
-                binding.profileImageView.setImageURI(uri)
-                // Guardamos la URI de la foto en SharedPreferences
-                saveProfilePhotoUri(uri)
+            // Usamos ?.let para asegurar que photoUri no sea null aquí
+            photoUri?.let { uriSegura ->
+                binding.profileImageView.setImageURI(uriSegura)
+                guardarFotoDePerfil(uriSegura.toString())
             }
-        }
-    }
-
-    // Lanzador para pedir permiso de cámara (reutilizado)
-    private val cameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            launchCamera()
         } else {
-            Toast.makeText(this, "Permiso de cámara denegado.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "No se tomó la foto", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -49,87 +42,96 @@ class ProfileActivity : AppCompatActivity() {
         binding = ActivityProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Configurar botón Volver
-        binding.backTextView.setOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.stay_still, R.anim.slide_out_left)
-        }
+        binding.backTextView.setOnClickListener { finish() }
 
-        // Configurar botón Cambiar Foto
+        cargarDatosUsuario()
+
         binding.changePhotoButton.setOnClickListener {
-            checkCameraPermission()
+            abrirCamara()
         }
 
-        // Cargar los datos del perfil al iniciar
-        loadProfileData()
+        binding.logoutButton.setOnClickListener {
+            cerrarSesion()
+        }
     }
 
-    private fun loadProfileData() {
+    private fun abrirCamara() {
+        try {
+            val photoFile = crearArchivoDeImagen()
+
+            // Generamos la URI
+            val uriTemporal = FileProvider.getUriForFile(
+                this,
+                "com.example.bicireparoapp.fileprovider",
+                photoFile
+            )
+
+            // 1. Guardamos en la variable global (para usarla después en el callback)
+            photoUri = uriTemporal
+
+            // 2. Usamos la variable LOCAL 'uriTemporal' para lanzar la cámara
+            // Al ser 'val' y local, Kotlin sabe que NO puede cambiar a null, así que no da error.
+            takePictureLauncher.launch(uriTemporal)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "Error al iniciar cámara: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun crearArchivoDeImagen(): File {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile(
+            "JPEG_${timeStamp}_",
+            ".jpg",
+            storageDir
+        )
+    }
+
+    private fun cargarDatosUsuario() {
         val sharedPrefs = getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
+        val name = sharedPrefs.getString("USER_NAME", "Usuario")
+        currentUserEmail = sharedPrefs.getString("USER_EMAIL", "") ?: ""
+        val role = sharedPrefs.getString("USER_ROLE", "Cliente")
 
-        // 1. Cargar Nombre y Email
-        val name = sharedPrefs.getString("USER_NAME", "No registrado")
-        val email = sharedPrefs.getString("USER_EMAIL", "No registrado")
-        binding.profileNameTextView.text = name
-        binding.profileEmailTextView.text = email
+        binding.nameTextView.text = name
+        binding.emailTextView.text = currentUserEmail
+        binding.roleTextView.text = role?.uppercase()
 
-        // 2. Cargar Foto de Perfil
-        val photoUriString = sharedPrefs.getString("PROFILE_PHOTO_URI", null)
+        val photoKey = "PROFILE_IMAGE_$currentUserEmail"
+        val photoUriString = sharedPrefs.getString(photoKey, null)
+
         if (photoUriString != null) {
             try {
-                // Convertimos el String de vuelta a Uri y lo mostramos
-                binding.profileImageView.setImageURI(photoUriString.toUri())
+                binding.profileImageView.setImageURI(Uri.parse(photoUriString))
             } catch (e: Exception) {
-                // Si la URI está corrupta o el archivo se borró
-                binding.profileImageView.setImageResource(android.R.drawable.ic_menu_camera)
+                // Error al cargar imagen, se mantiene la de defecto
             }
         }
     }
 
-    private fun saveProfilePhotoUri(uri: Uri) {
+    private fun guardarFotoDePerfil(uriString: String) {
+        val sharedPrefs = getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
+        val editor = sharedPrefs.edit()
+        val photoKey = "PROFILE_IMAGE_$currentUserEmail"
+        editor.putString(photoKey, uriString)
+        editor.apply()
+        Toast.makeText(this, "Foto guardada correctamente", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun cerrarSesion() {
         val sharedPrefs = getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
         with(sharedPrefs.edit()) {
-            // Guardamos la URI como un String
-            putString("PROFILE_PHOTO_URI", uri.toString())
+            remove("USER_NAME")
+            remove("USER_ROLE")
+            remove("USER_EMAIL")
             apply()
         }
-        Toast.makeText(this, "Foto de perfil actualizada", Toast.LENGTH_SHORT).show()
-    }
 
-    // --- Lógica de Cámara (Copiada y pegada de NewRequestActivity) ---
-
-    private fun checkCameraPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                launchCamera()
-            }
-            else -> {
-                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
-        }
-    }
-
-    private fun launchCamera() {
-        getTmpFileUri().let { uri ->
-            latestTmpUri = uri
-            takePictureLauncher.launch(uri)
-        }
-    }
-
-    private fun getTmpFileUri(): Uri {
-        // Usamos un nombre de archivo específico para la foto de perfil
-        val tmpFile = File(cacheDir, "profile_image.png").apply {
-            createNewFile()
-            deleteOnExit() // Opcional: puedes quitar esto si quieres que persista entre reinicios de la app
-        }
-
-        return FileProvider.getUriForFile(
-            applicationContext,
-            "${packageName}.fileprovider",
-            tmpFile
-        )
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 }

@@ -1,22 +1,24 @@
 package com.example.bicireparoapp.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import com.example.bicireparoapp.R
+import com.example.bicireparoapp.BiciReparoApplication
 import com.example.bicireparoapp.databinding.ActivityNewRequestBinding
 import com.example.bicireparoapp.model.Solicitud
+import com.example.bicireparoapp.viewmodel.SolicitudViewModel
+import com.example.bicireparoapp.viewmodel.SolicitudViewModelFactory
 import com.google.android.gms.location.LocationServices
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,33 +26,44 @@ import java.util.Locale
 class NewRequestActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityNewRequestBinding
-    private var latestTmpUri: Uri? = null
+    private var selectedImageUri: Uri? = null
 
-    // --- Lanzadores ---
+    private val viewModel: SolicitudViewModel by viewModels {
+        SolicitudViewModelFactory((application as BiciReparoApplication).repository)
+    }
+
+    // Cliente GPS
     private val fusedLocationClient by lazy {
         LocationServices.getFusedLocationProviderClient(this)
     }
+
+    // Permiso GPS
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) { getLocation() } else {
-            Toast.makeText(this, "Permiso de ubicación denegado.", Toast.LENGTH_LONG).show()
+        if (isGranted) {
+            obtenerUbicacionActual()
+        } else {
+            Toast.makeText(this, "Permiso de ubicación denegado", Toast.LENGTH_SHORT).show()
         }
     }
-    private val takePictureLauncher = registerForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { isSuccess ->
-        if (isSuccess) {
-            latestTmpUri?.let { uri ->
-                binding.photoPreviewImageView.setImageURI(uri)
+
+    // Selector de Imagen
+    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val imageUri = result.data?.data
+            if (imageUri != null) {
+                selectedImageUri = imageUri
+                binding.previewImageView.setImageURI(imageUri)
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        imageUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
-        }
-    }
-    private val cameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) { launchCamera() } else {
-            Toast.makeText(this, "Permiso de cámara denegado.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -59,129 +72,88 @@ class NewRequestActivity : AppCompatActivity() {
         binding = ActivityNewRequestBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // --- Configuración de Botones ---
-        binding.backTextView.setOnClickListener {
-            finish()
-            overridePendingTransition(R.anim.stay_still, R.anim.slide_out_left)
-        }
-        binding.takePhotoButton.setOnClickListener {
-            checkCameraPermission()
-        }
-        binding.getLocationButton.setOnClickListener {
+        binding.backTextView.setOnClickListener { finish() }
+
+        val services = listOf("Mantención General", "Reparación Frenos", "Ajuste Cambios", "Pinchazo", "Otro")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, services)
+        binding.serviceTypeAutoComplete.setAdapter(adapter)
+
+        // Botón GPS
+        binding.gpsButton.setOnClickListener {
             checkLocationPermission()
         }
 
-        binding.sendRequestButton.setOnClickListener {
-            val description = binding.descriptionEditText.text.toString().trim()
-            val locationText = binding.locationTextView.text.toString()
-
-            // --- Validaciones ---
-            if (description.isBlank()) {
-                binding.descriptionInputLayout.error = "La descripción es obligatoria"
-                return@setOnClickListener
-            } else {
-                binding.descriptionInputLayout.error = null
+        binding.uploadPhotoButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
             }
-            if (locationText == getString(R.string.location_placeholder)) {
-                Toast.makeText(this, "Por favor, registra tu ubicación", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (latestTmpUri == null) {
-                Toast.makeText(this, "Por favor, toma una foto del problema", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            // --- Fin Validaciones ---
+            pickImageLauncher.launch(intent)
+        }
 
-            // --- Lógica de Guardado ---
-            try {
-                val fechaActual = Date()
-                val formatoFecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-
-                val nuevaSolicitud = Solicitud(
-                    id = fechaActual.time,
-                    descripcion = description,
-                    fecha = formatoFecha.format(fechaActual),
-                    fotoUri = latestTmpUri.toString()
-                )
-
-                val sharedPrefs = getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
-                val gson = Gson()
-                val jsonRequests = sharedPrefs.getString("USER_REQUESTS", null)
-                val type = object : TypeToken<ArrayList<Solicitud>>() {}.type
-                val requestsList: ArrayList<Solicitud> = if (jsonRequests != null) {
-                    gson.fromJson(jsonRequests, type) ?: ArrayList()
-                } else {
-                    ArrayList()
-                }
-                requestsList.add(nuevaSolicitud)
-
-                with(sharedPrefs.edit()) {
-                    val updatedJsonRequests = gson.toJson(requestsList)
-                    putString("USER_REQUESTS", updatedJsonRequests)
-                    apply()
-                }
-
-                Toast.makeText(this, "Solicitud enviada y guardada", Toast.LENGTH_LONG).show()
-                finish()
-                overridePendingTransition(R.anim.stay_still, R.anim.slide_out_left)
-
-            } catch (e: Exception) {
-                Toast.makeText(this, "Error al guardar la solicitud", Toast.LENGTH_SHORT).show()
-                e.printStackTrace()
-            }
-            // --- Fin Lógica de Guardado ---
+        binding.submitButton.setOnClickListener {
+            crearSolicitud()
         }
     }
 
-    // --- Lógica de GPS  ---
     private fun checkLocationPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> { getLocation() }
-            else -> { locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
-        }
-    }
-    private fun getLocation() {
         if (ContextCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_FINE_LOCATION
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        binding.locationTextView.text = "Lat: ${location.latitude}, Lon: ${location.longitude}"
-                    } else {
-                        binding.locationTextView.text = "Ubicación no disponible. Activa el GPS."
-                    }
+            obtenerUbicacionActual()
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun obtenerUbicacionActual() {
+        try {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    val coordenadas = "Lat: ${location.latitude}, Lon: ${location.longitude}"
+                    binding.locationEditText.setText(coordenadas)
+                    Toast.makeText(this, "Ubicación obtenida", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Activa el GPS", Toast.LENGTH_LONG).show()
                 }
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
         }
     }
 
-    // --- Lógica de Cámara ---
-    private fun checkCameraPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> { launchCamera() }
-            else -> { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }
-        }
-    }
-    private fun launchCamera() {
-        getTmpFileUri().let { uri ->
-            latestTmpUri = uri
-            takePictureLauncher.launch(uri)
-        }
-    }
-    private fun getTmpFileUri(): Uri {
-        val tmpFile = File.createTempFile("request_image_${System.currentTimeMillis()}", ".png", cacheDir).apply {
-            createNewFile()
+    private fun crearSolicitud() {
+        val tipoServicio = binding.serviceTypeAutoComplete.text.toString()
+        val descripcionInput = binding.descriptionEditText.text.toString()
+        val ubicacion = binding.locationEditText.text.toString()
 
+        if (tipoServicio.isEmpty() || descripcionInput.isEmpty() || ubicacion.isEmpty()) {
+            Toast.makeText(this, "Completa descripción y ubicación", Toast.LENGTH_SHORT).show()
+            return
         }
-        return FileProvider.getUriForFile(
-            applicationContext,
-            "${packageName}.fileprovider",
-            tmpFile
+
+        // Unimos la ubicación a la descripción para guardarla
+        val descripcionFinal = "Ubicación: $ubicacion\n\nDetalle: $descripcionInput"
+
+        val fechaActual = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+
+        val sharedPrefs = getSharedPreferences("BiciReparoPrefs", Context.MODE_PRIVATE)
+        val userEmail = sharedPrefs.getString("USER_EMAIL", "invitado@bicireparo.com") ?: "invitado@bicireparo.com"
+
+        val nuevaSolicitud = Solicitud(
+            descripcion = descripcionFinal,
+            fecha = fechaActual,
+            fotoUri = selectedImageUri?.toString(),
+            tipoServicio = tipoServicio,
+            precioEstimado = 0,
+            usuarioEmail = userEmail
         )
+
+        viewModel.insert(nuevaSolicitud)
+
+        Toast.makeText(this, "Solicitud enviada", Toast.LENGTH_SHORT).show()
+        finish()
     }
 }

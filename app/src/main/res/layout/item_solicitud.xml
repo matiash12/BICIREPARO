@@ -5,60 +5,68 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
     android:layout_marginHorizontal="8dp"
-    android:layout_marginVertical="8dp"
-    app:cardElevation="4dp"
-    app:cardCornerRadius="8dp">
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            android:layout_marginEnd="12dp">
+
+            <ImageView
+                android:id="@+id/solicitudImageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_popular"
+                android:background="#F0F0F0"
+                tools:ignore="ContentDescription" />
+        </androidx.cardview.widget.CardView>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/solicitudDescriptionTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="Descripción de la solicitud"
+                android:textSize="16sp"
+                android:textColor="@color/bike_grey"
+                android:maxLines="6"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/solicitudDateTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="Fecha: 01/01/2025"
+                android:textSize="12sp"
+                android:textColor="#757575"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
 
         <ImageView
-            android:id="@+id/itemFotoImageView"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:scaleType="centerCrop"
-            android:background="#E0E0E0"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:src="@android:drawable/ic_menu_camera" />
-
-        <TextView
-            android:id="@+id/itemDescripcionTextView"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintStart_toEndOf="@id/itemFotoImageView"
-            app:layout_constraintTop_toTopOf="@id/itemFotoImageView"
-            app:layout_constraintEnd_toStartOf="@id/itemDeleteButton"
-            tools:text="Descripción larga del problema de la bicicleta que se está reportando" />
-
-        <TextView
-            android:id="@+id/itemFechaTextView"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="14sp"
-            app:layout_constraintStart_toStartOf="@id/itemDescripcionTextView"
-            app:layout_constraintTop_toBottomOf="@id/itemDescripcionTextView"
-            app:layout_constraintEnd_toEndOf="@id/itemDescripcionTextView"
-            tools:text="01/11/2025 14:30" />
-
-        <ImageButton
-            android:id="@+id/itemDeleteButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:id="@+id/solicitudDeleteButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Eliminar solicitud"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:tint="?android:attr/textColorSecondary" />
+            app:tint="@color/bike_grey"
+            android:layout_marginStart="8dp"
+            android:contentDescription="Eliminar Solicitud" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
+    </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

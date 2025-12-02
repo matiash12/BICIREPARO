@@ -1,97 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    tools:context=".ui.RegisterActivity">
-
-    <TextView
-        android:id="@+id/backTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/text_back"
-        android:textSize="16sp"
-        android:clickable="true"
-        android:focusable="true"
-        android:drawableStart="@android:drawable/ic_media_previous"
-        android:drawablePadding="8dp"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="24dp"/>
+    android:gravity="center">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/title_register"
-        android:textSize="32sp"
+        android:text="Crear Cuenta"
+        android:textSize="28sp"
         android:textStyle="bold"
-        android:layout_gravity="center"
-        android:layout_marginBottom="24dp"/>
+        android:layout_marginBottom="32dp"/>
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/nameInputLayout"
+    <EditText
+        android:id="@+id/nombreEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp">
+        android:hint="Nombre completo"
+        android:inputType="textPersonName"
+        android:layout_marginBottom="16dp"/>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/nameEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_name"
-            android:inputType="textPersonName" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/emailInputLayout"
+    <EditText
+        android:id="@+id/emailEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp">
+        android:hint="Correo electrónico"
+        android:inputType="textEmailAddress"
+        android:layout_marginBottom="16dp"/>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/emailEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_email"
-            android:inputType="textEmailAddress" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/passwordInputLayout"
+    <EditText
+        android:id="@+id/passwordEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:passwordToggleEnabled="true"
-        android:layout_marginBottom="16dp">
+        android:hint="Contraseña"
+        android:inputType="textPassword"
+        android:layout_marginBottom="16dp"/>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/passwordEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_password"
-            android:inputType="textPassword" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/confirmPasswordInputLayout"
-        android:layout_width="match_parent"
+    <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:passwordToggleEnabled="true"
-        android:layout_marginBottom="24dp">
+        android:text="Selecciona tu Rol:"
+        android:layout_gravity="start"
+        android:layout_marginBottom="4dp"/>
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/confirmPasswordEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_confirm_password"
-            android:inputType="textPassword" />
-    </com.google.android.material.textfield.TextInputLayout>
+    <Spinner
+        android:id="@+id/roleSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="32dp"/>
 
     <Button
         android:id="@+id/registerButton"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/button_register" />
+        android:layout_height="60dp"
+        android:text="Registrarse"
+        android:textSize="18sp"/>
 
 </LinearLayout>

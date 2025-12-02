@@ -115,6 +115,4 @@ Desde Android Studio: Clic derecho en la carpeta test -> "Run Tests".
 
 👥 Autores: Matias Molina Carlos Caceres
 
-[Tu Nombre] - Desarrollador Principal
-
 Proyecto desarrollado para la asignatura de Desarrollo de Aplicaciones Móviles (DSY1105) - Duoc UC.
